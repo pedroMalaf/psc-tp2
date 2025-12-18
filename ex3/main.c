@@ -3,10 +3,32 @@
 #include <string.h>
 #include <ctype.h>
 #include "../table/table.h"
+#include <stdbool.h>
 
 struct table *current_table = NULL;
 
 #define MAX_CMD_LEN 1024
+
+// Estrutura para passar dados ao filtro
+struct filter_ctx
+{
+    int col_idx;       // Índice da coluna a verificar
+    char *search_term; // Texto que queremos encontrar
+};
+
+// Função Predicado: Retorna true se a linha deve ser mantida
+bool filter_equals(const void *row_ptr, const void *context)
+{
+    char **row = (char **)row_ptr;
+    const struct filter_ctx *ctx = (const struct filter_ctx *)context;
+
+    if (!row[ctx->col_idx])
+        return false;
+
+    // Compara o conteúdo da célula com o termo de pesquisa
+    // strcmp retorna 0 se forem iguais
+    return strcmp(row[ctx->col_idx], ctx->search_term) == 0;
+}
 
 int get_col_index(char c)
 {
@@ -38,6 +60,8 @@ int get_command(const char *cmd)
         return 4;
     if (strcmp(cmd, "show") == 0)
         return 5;
+    if (strcmp(cmd, "filter") == 0)
+        return 6;
     return 0;
 }
 
@@ -48,6 +72,7 @@ void list_commands()
     printf("load <filename>             -loads the content of the file <filename> to the table\n");
     printf("save <filename>             -saves the table on the file <filename>\n");
     printf("show <col><row>:<col><row>  -shows the content of the table defined by the given coordinates\n");
+    printf("filter <column><data>       -eliminates the lines of the table with the content in <column> different from <data>\n");
 }
 
 void load_table(char *args)
@@ -137,6 +162,64 @@ void show_sub_table(char *args)
     }
 }
 
+void filter_table(char *args)
+{
+    if (!current_table)
+    {
+        printf("Error: No table is currently loaded.\n");
+        return;
+    }
+    if (!args)
+    {
+        printf("Error: Usage filter <col> <value>\n");
+        return;
+    }
+
+    // Separar a Coluna do Valor
+    // args vem como "B Maça\n"
+    char *col_str = strtok(args, " ");  // Pega no "B"
+    char *val_str = strtok(NULL, "\n"); // Pega no resto da linha ("Maça")
+
+    if (!col_str || !val_str)
+    {
+        printf("Error: Invalid format. Usage: filter <col> <value>\n");
+        return;
+    }
+
+    // Converter letra da coluna para índice
+    int col_idx = get_col_index(col_str[0]);
+
+    // Validar se a coluna existe
+    if (col_idx < 0 || col_idx >= current_table->num_cols)
+    {
+        printf("Error: Invalid column '%s'.\n", col_str);
+        return;
+    }
+
+    // Preparar o contexto para o filtro
+    struct filter_ctx ctx;
+    ctx.col_idx = col_idx;
+    ctx.search_term = val_str;
+
+    // Chamar a função da biblioteca
+    struct table *new_table = table_filter(current_table, filter_equals, &ctx);
+
+    if (new_table)
+    {
+        printf("Filter applied. Rows reduced from %lu to %lu.\n",
+               (unsigned long)current_table->num_rows,
+               (unsigned long)new_table->num_rows);
+
+        // Substituir a tabela antiga pela nova
+        clear_current_table();     // Liberta a memória da antiga
+        current_table = new_table; // Aponta para a nova
+    }
+    else
+    {
+        printf("Error: Filter failed (memory or internal error).\n");
+    }
+}
+
 int main()
 {
     char input[MAX_CMD_LEN];
@@ -176,6 +259,9 @@ int main()
             break;
         case 5:
             show_sub_table(args);
+            break;
+        case 6:
+            filter_table(args);
             break;
         default:
             printf("Unkown command: %s\n", cmd);
