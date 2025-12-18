@@ -232,6 +232,14 @@ struct table *table_load_csv(const char *filename)
     }
 
     csv_fini(&p, process_cell, process_row, &ctx);
+
+    // aqui estamos a libertar memória alocada porque na função process_row é alocada sempre memória para a próxima row
+    // quando chegamos ao fim do ficheiro e não temos mais rows para ler, ele aloca à mesma memória para a próxima row
+    if (ctx.temp_row != NULL)
+    {
+        free(ctx.temp_row);
+    }
+
     csv_free(&p);
     fclose(fp);
 
