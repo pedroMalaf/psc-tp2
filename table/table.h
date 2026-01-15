@@ -26,6 +26,9 @@ struct table *table_filter(const struct table *table,
                            bool (*predicate)(const void *row, const void *context),
                            const void *context);
 
+// Elimina uma linha da tabela (retorna 0 em sucesso, -1 em erro)
+int table_delete_row(struct table *table, size_t row_index);
+
 // Liberta memória
 void table_free(struct table *t);
 

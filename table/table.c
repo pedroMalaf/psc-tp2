@@ -364,3 +364,30 @@ struct table *table_filter(const struct table *table,
 
     return new_table;
 }
+// função para eliminar uma linha da tabela
+int table_delete_row(struct table *table, size_t row_index)
+{
+    if (!table || row_index >= table->num_rows)
+        return -1;
+
+    // Libertar a memória da linha a eliminar
+    if (table->data[row_index])
+    {
+        for (size_t j = 0; j < table->num_cols; j++)
+        {
+            free(table->data[row_index][j]);
+        }
+        free(table->data[row_index]);
+    }
+
+    // Mover todas as linhas seguintes uma posição para cima
+    for (size_t i = row_index; i < table->num_rows - 1; i++)
+    {
+        table->data[i] = table->data[i + 1];
+    }
+
+    // Decrementar o número de linhas
+    table->num_rows--;
+
+    return 0;
+}
